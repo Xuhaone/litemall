@@ -74,7 +74,13 @@
         <dependency>
             <groupId>org.linlinjava</groupId>
             <artifactId>litemall-db</artifactId>
+            <version>0.1.0</version>
         </dependency>
     </dependencies>
-
+    <distributionManagement>
+        <repository>
+            <id>localRepository</id>
+            <url>file:C:/Users/lzh/.m2/repository</url>
+        </repository>
+    </distributionManagement>
 </project>

@@ -176,7 +176,7 @@ public class WxAuthController {
 
     /**
      * 请求注册验证码
-     *
+     * <p>
      * TODO
      * 这里需要一定机制防止短信验证码被滥用
      *
@@ -239,10 +239,12 @@ public class WxAuthController {
         String password = JacksonUtil.parseString(body, "password");
         String mobile = JacksonUtil.parseString(body, "mobile");
         String code = JacksonUtil.parseString(body, "code");
+        // 如果是小程序注册，则必须非空
+        // 其他情况，可以为空
         String wxCode = JacksonUtil.parseString(body, "wxCode");
 
         if (StringUtils.isEmpty(username) || StringUtils.isEmpty(password) || StringUtils.isEmpty(mobile)
-                || StringUtils.isEmpty(wxCode) || StringUtils.isEmpty(code)) {
+                || StringUtils.isEmpty(code)) {
             return ResponseUtil.badArgument();
         }
 
@@ -259,29 +261,34 @@ public class WxAuthController {
             return ResponseUtil.fail(AUTH_INVALID_MOBILE, "手机号格式不正确");
         }
         //判断验证码是否正确
-        String cacheCode = CaptchaCodeManager.getCachedCaptcha(mobile);
+        //String cacheCode = CaptchaCodeManager.getCachedCaptcha(mobile);
+        String cacheCode = "8888";
         if (cacheCode == null || cacheCode.isEmpty() || !cacheCode.equals(code)) {
             return ResponseUtil.fail(AUTH_CAPTCHA_UNMATCH, "验证码错误");
         }
 
-        String openId = null;
-        try {
-            WxMaJscode2SessionResult result = this.wxService.getUserService().getSessionInfo(wxCode);
-            openId = result.getOpenid();
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseUtil.fail(AUTH_OPENID_UNACCESS, "openid 获取失败");
-        }
-        userList = userService.queryByOpenid(openId);
-        if (userList.size() > 1) {
-            return ResponseUtil.serious();
-        }
-        if (userList.size() == 1) {
-            LitemallUser checkUser = userList.get(0);
-            String checkUsername = checkUser.getUsername();
-            String checkPassword = checkUser.getPassword();
-            if (!checkUsername.equals(openId) || !checkPassword.equals(openId)) {
-                return ResponseUtil.fail(AUTH_OPENID_BINDED, "openid已绑定账号");
+        String openId = "";
+        // 非空，则是小程序注册
+        // 继续验证openid
+        if (!StringUtils.isEmpty(wxCode)) {
+            try {
+                WxMaJscode2SessionResult result = this.wxService.getUserService().getSessionInfo(wxCode);
+                openId = result.getOpenid();
+            } catch (Exception e) {
+                e.printStackTrace();
+                return ResponseUtil.fail(AUTH_OPENID_UNACCESS, "openid 获取失败");
+            }
+            userList = userService.queryByOpenid(openId);
+            if (userList.size() > 1) {
+                return ResponseUtil.serious();
+            }
+            if (userList.size() == 1) {
+                LitemallUser checkUser = userList.get(0);
+                String checkUsername = checkUser.getUsername();
+                String checkPassword = checkUser.getPassword();
+                if (!checkUsername.equals(openId) || !checkPassword.equals(openId)) {
+                    return ResponseUtil.fail(AUTH_OPENID_BINDED, "openid已绑定账号");
+                }
             }
         }
 
@@ -312,7 +319,7 @@ public class WxAuthController {
 
         // token
         String token = UserTokenManager.generateToken(user.getId());
-        
+
         Map<Object, Object> result = new HashMap<Object, Object>();
         result.put("token", token);
         result.put("userInfo", userInfo);
@@ -322,7 +329,7 @@ public class WxAuthController {
 
     /**
      * 请求验证码
-     *
+     * <p>
      * TODO
      * 这里需要一定机制防止短信验证码被滥用
      *
@@ -331,7 +338,7 @@ public class WxAuthController {
      */
     @PostMapping("captcha")
     public Object captcha(@LoginUser Integer userId, @RequestBody String body) {
-        if(userId == null){
+        if (userId == null) {
             return ResponseUtil.unlogin();
         }
         String phoneNumber = JacksonUtil.parseString(body, "mobile");
@@ -430,7 +437,7 @@ public class WxAuthController {
      */
     @PostMapping("resetPhone")
     public Object resetPhone(@LoginUser Integer userId, @RequestBody String body, HttpServletRequest request) {
-        if(userId == null){
+        if (userId == null) {
             return ResponseUtil.unlogin();
         }
         String password = JacksonUtil.parseString(body, "password");
@@ -483,7 +490,7 @@ public class WxAuthController {
      */
     @PostMapping("profile")
     public Object profile(@LoginUser Integer userId, @RequestBody String body, HttpServletRequest request) {
-        if(userId == null){
+        if (userId == null) {
             return ResponseUtil.unlogin();
         }
         String avatar = JacksonUtil.parseString(body, "avatar");
@@ -491,13 +498,13 @@ public class WxAuthController {
         String nickname = JacksonUtil.parseString(body, "nickname");
 
         LitemallUser user = userService.findById(userId);
-        if(!StringUtils.isEmpty(avatar)){
+        if (!StringUtils.isEmpty(avatar)) {
             user.setAvatar(avatar);
         }
-        if(gender != null){
+        if (gender != null) {
             user.setGender(gender);
         }
-        if(!StringUtils.isEmpty(nickname)){
+        if (!StringUtils.isEmpty(nickname)) {
             user.setNickname(nickname);
         }
 
@@ -517,10 +524,10 @@ public class WxAuthController {
      */
     @PostMapping("bindPhone")
     public Object bindPhone(@LoginUser Integer userId, @RequestBody String body) {
-    	if (userId == null) {
+        if (userId == null) {
             return ResponseUtil.unlogin();
         }
-    	LitemallUser user = userService.findById(userId);
+        LitemallUser user = userService.findById(userId);
         String encryptedData = JacksonUtil.parseString(body, "encryptedData");
         String iv = JacksonUtil.parseString(body, "iv");
         WxMaPhoneNumberInfo phoneNumberInfo = this.wxService.getUserService().getPhoneNoInfo(user.getSessionKey(), encryptedData, iv);
@@ -554,66 +561,5 @@ public class WxAuthController {
         data.put("mobile", user.getMobile());
 
         return ResponseUtil.ok(data);
-    }
-
-    @PostMapping("appregister")
-    public Object appRegister(@RequestBody String body, HttpServletRequest request) {
-        String username = JacksonUtil.parseString(body, "username");
-        String password = JacksonUtil.parseString(body, "password");
-
-        if (StringUtils.isEmpty(username) || StringUtils.isEmpty(password)) {
-            return ResponseUtil.badArgument();
-        }
-        List<LitemallUser> userList = userService.queryByUsername(username);
-        if (userList.size() > 0) {
-            return ResponseUtil.fail(AUTH_NAME_REGISTERED, "手机号已注册");
-        }
-        if (!RegexUtil.isMobileExact(username)) {
-            return ResponseUtil.fail(AUTH_INVALID_MOBILE, "手机号格式不正确");
-        }
-
-        String openId = username + "123456789";
-        userList = userService.queryByOpenid(openId);
-        if (userList.size() > 1) {
-            return ResponseUtil.serious();
-        }
-        if (userList.size() == 1) {
-            LitemallUser checkUser = userList.get(0);
-            String checkUsername = checkUser.getUsername();
-            String checkPassword = checkUser.getPassword();
-            if (!checkUsername.equals(openId) || !checkPassword.equals(openId)) {
-                return ResponseUtil.fail(AUTH_OPENID_BINDED, "openid已绑定账号");
-            }
-        }
-        LitemallUser user = null;
-        BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
-        String encodedPassword = encoder.encode(password);
-        user = new LitemallUser();
-        user.setUsername(username);
-        user.setPassword(encodedPassword);
-        user.setMobile(username);
-        user.setWeixinOpenid(openId);
-        user.setAvatar("https://yanxuan.nosdn.127.net/80841d741d7fa3073e0ae27bf487339f.jpg?imageView&quality=90&thumbnail=64x64");
-        user.setNickname(username);
-        user.setGender((byte) 0);
-        user.setUserLevel((byte) 0);
-        user.setStatus((byte) 0);
-        user.setLastLoginTime(LocalDateTime.now());
-        user.setLastLoginIp(IpUtil.getIpAddr(request));
-        userService.add(user);
-
-        // 给新用户发送注册优惠券
-        couponAssignService.assignForRegister(user.getId());
-        // userInfo
-        UserInfo userInfo = new UserInfo();
-        userInfo.setNickName(username);
-        userInfo.setAvatarUrl(user.getAvatar());
-        // token
-        String token = UserTokenManager.generateToken(user.getId());
-
-        Map<Object, Object> result = new HashMap<Object, Object>();
-        result.put("token", token);
-        result.put("userInfo", userInfo);
-        return ResponseUtil.ok(result);
     }
 }

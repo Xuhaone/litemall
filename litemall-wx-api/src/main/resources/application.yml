@@ -3,7 +3,8 @@ spring:
     active: db, core, wx
   messages:
     encoding: UTF-8
-
+  jmx:
+    enabled: false
 server:
   port: 8082
 
